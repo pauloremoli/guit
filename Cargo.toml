@@ -5,8 +5,10 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.83"
+argh = "0.1.12"
 crossterm = "0.27.0"
 git2 = "0.18.3"
+rand = "0.8.5"
 ratatui = "0.26.2"
 serde = { version = "1.0.201", features = ["derive"] }
 serde_json = "1.0.117"
