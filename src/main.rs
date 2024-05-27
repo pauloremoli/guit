@@ -8,6 +8,7 @@ use std::{
 use argh::FromArgs;
 use std::env;
 mod app;
+mod repository;
 
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind};
 use crossterm::execute;
@@ -45,7 +46,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         .repo_path
         .or(Some(env::current_dir().unwrap()))
         .expect("Invalid repository path");
-    let app = App::new(&repo_path);
+
+
+
+    let repo = match git2::Repository::init(repo_path) {
+        Ok(repo) => repo,
+        Err(e) => panic!("failed to init: {}", e),
+    };
+    
+    let app = App::new(&repo);
     let res = run_app(&mut terminal, app, tick_rate);
 
     // restore terminal

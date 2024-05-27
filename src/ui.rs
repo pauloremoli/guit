@@ -60,6 +60,13 @@ fn draw_left_panes(f: &mut Frame, app: &mut App, area: Rect) {
     draw_branches(app, f, &chunks[2]);
 }
 
+fn get_initials(name: &str) -> String {
+    name.split(" ")
+        .into_iter()
+        .map(|item| item[..1].to_uppercase().to_owned())
+        .collect()
+}
+
 fn draw_commits(app: &mut App, f: &mut Frame, area: &Rect) {
     let commit_message_style = Style::default().fg(Color::White);
     let author_style = Style::default().fg(Color::LightBlue);
@@ -71,11 +78,17 @@ fn draw_commits(app: &mut App, f: &mut Frame, area: &Rect) {
         .iter()
         .map(|commit| {
             let content = vec![text::Line::from(vec![
-                Span::styled(&commit.0, hash_style),
+                Span::styled(commit.id().to_string()[..7].to_owned(), hash_style),
                 Span::raw(" "),
-                Span::styled(&commit.1, author_style),
+                Span::styled(
+                    get_initials(commit.author().name().unwrap_or("")),
+                    author_style,
+                ),
                 Span::raw(" "),
-                Span::styled(&commit.2, commit_message_style),
+                Span::styled(
+                    commit.summary().unwrap_or("").to_string(),
+                    commit_message_style,
+                ),
             ])];
             ListItem::new(content)
         })

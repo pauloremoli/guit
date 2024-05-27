@@ -1,83 +1,5 @@
-use std::{collections::HashMap, path::PathBuf};
-
-use anyhow::{Error, Result};
-use git2::{BranchType, Commit, Repository};
+use git2::{BranchType, Repository};
 use ratatui::widgets::ListState;
-
-pub fn commits(repo: &Repository, limit: Option<usize>) -> Vec<(String, String, String)> {
-    let limit = limit.unwrap_or(20);
-    let mut result = Vec::new();
-
-    let head = match repo.head() {
-        Ok(head) => head,
-        Err(_) => return result,
-    };
-
-    let mut revwalk = match repo.revwalk() {
-        Ok(revwalk) => revwalk,
-        Err(_) => return result,
-    };
-
-    revwalk.push(head.target().unwrap()).unwrap();
-    revwalk.set_sorting(git2::Sort::TIME).unwrap();
-
-    for oid in revwalk.take(limit) {
-        if let Ok(oid) = oid {
-            if let Ok(commit) = repo.find_commit(oid) {
-                let commit_hash = commit.id().to_string()[..7].to_owned();
-                let author = commit.author().name().unwrap_or("").to_string();
-                let message = commit.summary().unwrap_or("").to_string();
-
-                result.push((commit_hash, author, message));
-            }
-        }
-    }
-
-    result
-}
-
-pub fn reflog(repo: &Repository, limit: Option<usize>) -> Vec<(String, String, String)> {
-    let limit = limit.unwrap_or(100);
-    let mut result = Vec::new();
-
-    let mut revwalk = match repo.revwalk() {
-        Ok(revwalk) => revwalk,
-        Err(_) => return result,
-    };
-
-    revwalk.set_sorting(git2::Sort::TIME).unwrap();
-
-    for oid in revwalk.take(limit) {
-        if let Ok(oid) = oid {
-            if let Ok(commit) = repo.find_commit(oid) {
-                let commit_hash = commit.id().to_string()[..7].to_owned();
-                let author = commit.author().name().unwrap_or("").to_string();
-                let message = commit.summary().unwrap_or("").to_string();
-
-                result.push((commit_hash, author, message));
-            }
-        }
-    }
-
-    result
-}
-
-pub fn branches(repo: &Repository, branch_type: BranchType) -> Vec<String> {
-    let branches = repo
-        .branches(Some(branch_type))
-        .expect("Could not list branches from repo");
-    branches
-        .filter_map(|branch| match branch {
-            Ok((branch, _)) => match branch.name() {
-                Ok(Some(value)) => Some(value.to_owned()),
-                _ => None,
-            },
-
-            _ => None,
-        })
-        .collect::<Vec<String>>()
-}
-
 pub struct StatefulList<T> {
     pub state: ListState,
     pub items: Vec<T>,
@@ -127,26 +49,21 @@ pub enum Section {
     REFLOG,
 }
 
-pub struct App {
-    pub repo: Repository,
+pub struct App<'a> {
+    pub repo: &'a Repository,
     pub should_quit: bool,
     pub branches: StatefulList<String>,
     pub status: StatefulList<String>,
-    pub commits: StatefulList<(String, String, String)>,
+    pub commits: StatefulList<git2::Commit<'a>>,
     pub reflog: StatefulList<(String, String, String)>,
     pub active_section: Section,
 }
 
-impl App {
-    pub fn new(repo_path: &PathBuf) -> Self {
-        let repo = match Repository::init(repo_path) {
-            Ok(repo) => repo,
-            Err(e) => panic!("failed to init: {}", e),
-        };
-
-        let commits = commits(&repo, None);
-        let branches = branches(&repo, BranchType::Local);
-        let reflog = reflog(&repo, None);
+impl<'a> App<'a> {
+    pub fn new(repo: &'a Repository) -> Self {
+        let commits = crate::repository::commits(&repo, None);
+        let branches = crate::repository::branches(&repo, BranchType::Local);
+        let reflog = crate::repository::reflog(&repo, None);
         App {
             repo,
             should_quit: false,
@@ -158,7 +75,7 @@ impl App {
                 "Item4".to_owned(),
                 "Item5".to_owned(),
             ]),
-            commits: StatefulList::with_items(commits),
+            commits: StatefulList::with_items(commits.expect("Could not load commits")),
             active_section: Section::STATUS,
             reflog: StatefulList::with_items(reflog),
         }
